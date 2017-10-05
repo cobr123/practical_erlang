@@ -8,30 +8,34 @@ init() ->
   %% init randomizer
   <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
   random:seed({A, B, C}),
-  State = [],
+  State = {maps:new(), maps:new()},
   State.
 
 
-create_short(LongLink, State, []) ->
-  ShortLink = rand_str(length(LongLink)),
-  {ShortLink, [{LongLink, ShortLink} | State]};
-create_short(LongLink, State, Acc) ->
-  [Head | Tail] = Acc,
-  {Long, Short} = Head,
-  if Long =:= LongLink -> {Short, [{LongLink, Short} | State]};
-    true -> create_short(LongLink, State, Tail)
+create_short(LongLink, State) ->
+  {LongAsKey, ShortAsKey} = State,
+  case maps:find(LongLink, LongAsKey) of
+    {ok, ShortLink} -> {ShortLink, State};
+    error -> ShortLink = gen_short(LongLink, ShortAsKey),
+      NewLongLink = maps:put(LongLink, ShortLink, LongAsKey),
+      NewShortAsKey = maps:put(ShortLink, LongLink, ShortAsKey),
+      {ShortLink, {NewLongLink, NewShortAsKey}}
   end.
 
 
-create_short(LongLink, State) -> create_short(LongLink, State, State).
-
-
-get_long(_, []) -> {error, not_found};
 get_long(ShortLink, State) ->
-  [Head | Tail] = State,
-  {Long, Short} = Head,
-  if Short =:= ShortLink -> {ok, Long};
-    true -> get_long(ShortLink, Tail)
+  {_, ShortAsKey} = State,
+  case maps:find(ShortLink, ShortAsKey) of
+    {ok, LongLink} -> {ok, LongLink};
+    error -> {error, not_found}
+  end.
+
+
+gen_short(LongLink, ShortAsKey) ->
+  ShortLink = rand_str(length(LongLink)),
+  case maps:find(ShortLink, ShortAsKey) of
+    {ok, _} -> gen_short(LongLink, ShortAsKey);
+    error -> ShortLink
   end.
 
 
