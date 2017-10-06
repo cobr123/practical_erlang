@@ -4,9 +4,16 @@
 
 
 start(Files) ->
-  %Self = self(),
-  %Pids = [spawn(fun() -> Self ! readlines(File) end) || File <- Files],
-  Words = lists:foldl(fun(File, Acc) -> lists:append(Acc, readlines(File)) end, [], Files),
+  Self = self(),
+  Words = lists:foldl(fun(File, Acc) ->
+    spawn(fun() -> Self ! readlines(File) end),
+    receive
+      List -> lists:append(Acc, List)
+    end
+    end
+    , []
+    , Files
+  ),
   lists:foldl(fun(Word, Map) ->
     BinWord = binary:list_to_bin(Word),
     case maps:find(BinWord, Map) of
@@ -17,6 +24,7 @@ start(Files) ->
     , maps:new()
     , Words
   ).
+
 
 readlines(FileName) ->
   case file:read_file(FileName) of
